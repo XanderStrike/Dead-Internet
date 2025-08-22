@@ -20,7 +20,7 @@ class ReaperEngine:
         self.model_name = "gemma3:1b"
         self.temperature = 1 # Crank up for goofier webpages (but probably less functional javascript)
         self.max_tokens = 4096
-        self.system_prompt = "You are an expert in creating realistic webpages. You do not create sample pages, instead you create webpages that are completely realistic and look as if they really existed on the web. You do not respond with anything but HTML, starting your messages with <!DOCTYPE html> and ending them with </html>.  You use very little to no images at all in your HTML, CSS or JS, and when you do use an image it'll be linked from a real website instead. Link to very few external resources, CSS and JS should ideally be internal in <style>/<script> tags and not linked from elsewhere."
+        self.system_prompt = "You are a web developer creating authentic vintage websites from the early 2000s era. Your task is to generate complete HTML pages that look genuinely retro.\n\nRules:\n1. Always start with <!DOCTYPE html> and end with </html>\n2. Only output HTML code, no explanations or comments\n3. Use inline CSS in <style> tags, no external stylesheets\n4. Include JavaScript in <script> tags if needed\n5. Avoid using images unless absolutely necessary\n6. Make pages look like they're from GeoCities, Angelfire, or similar retro hosting\n7. Use bright colors, animated GIFs sparingly, and retro web design elements\n8. Create realistic content that fits the website's theme"
         
         # Ensure the model is available
         self._ensure_model_available()
@@ -103,7 +103,7 @@ class ReaperEngine:
         except: pass
         
         # Construct the basic prompt
-        prompt = f"Give me a classic geocities-style webpage from the fictional site of '{url}' at the resource path of '{path}'. Make sure all links generated either link to an external website, or if they link to another resource on the current website have the current url prepended ({url}) to them. For example if a link on the page has the href of 'help' or '/help', it should be replaced with '{url}/path'. All your links must use absolute paths, do not shorten anything. Make the page look nice and unique using internal CSS stylesheets, don't make the pages look boring or generic."
+        prompt = f"Create a retro webpage for the website '{url}' at path '{path}'.\n\nRequirements:\n- Make it look like a classic GeoCities or early 2000s website\n- Use bright colors and retro styling\n- All internal links must be absolute paths starting with '{url}/'\n- External links should go to real websites\n- Include realistic content that matches the site's theme\n- Use inline CSS for styling\n- Make it unique and interesting, not generic\n\nWebsite: {url}\nPath: {path}\n\nGenerate the complete HTML:"
         # TODO: I wanna add all other pages to the prompt so the next pages generated resemble them, but since Llama 3 is only 8k context I hesitate to do so
 
         # Add other pages to the prompt if they exist
@@ -140,7 +140,7 @@ class ReaperEngine:
             },
             {
                 "role": "user",
-                "content": f"Generate the search results page for a ficticious search engine where the search query is '{query}'. Please include at least 10 results to different ficticious websites that relate to the query. DO NOT link to any real websites, every link should lead to a ficticious website. Feel free to add a bit of CSS to make the page look nice. Each search result will link to its own unique website that has nothing to do with the search engine and is not a path or webpage on the search engine's site. Make sure each ficticious website has a unique and somewhat creative URL. Don't mention that the results are ficticious."
+                "content": f"Create a search results page for the query: '{query}'\n\nRequirements:\n- Design it like a retro search engine from the early 2000s\n- Include exactly 10 search results\n- Each result must link to a different fictional website\n- Use creative, realistic-sounding domain names\n- Add descriptions for each result\n- Style with retro CSS (bright colors, simple layout)\n- Make it look authentic, don't mention it's fictional\n- Each link should be to the root of a fictional website (not subpages)\n\nSearch query: {query}\n\nGenerate the complete HTML search results page:"
             }
         ])
 
