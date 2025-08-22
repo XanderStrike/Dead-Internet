@@ -2,7 +2,6 @@ import json
 import os
 import time
 import requests
-from openai import OpenAI
 from bs4 import BeautifulSoup
 
 ''' About the name...
@@ -16,7 +15,6 @@ class ReaperEngine:
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1/")
         self.ollama_api_url = self.ollama_base_url.replace("/v1/", "")
         
-        self.client = OpenAI(base_url=self.ollama_base_url, api_key="Dead Internet") # Ollama is pretty cool
         self.internet_db = dict() # TODO: Exporting this sounds like a good idea, losing all your pages when you kill the script kinda sucks ngl, also loading it is a thing too
 
         self.model_name = "llama3"
@@ -113,7 +111,7 @@ class ReaperEngine:
             pass
         
         # Generate the page
-        generated_page_completion = self.client.chat.completions.create(messages=[
+        generated_page = self._generate_completion([
             {
                 "role": "system",
                 "content": self.system_prompt
@@ -121,14 +119,8 @@ class ReaperEngine:
             {
                 "role": "user",
                 "content": prompt
-            }],
-            model=self.model_name, # What a great model, works near perfectly with this, shame its only got 8k context (does Ollama even set it to that by default?)
-            temperature=self.temperature,
-            max_tokens=self.max_tokens
-        )
-
-        # Get and format the page
-        generated_page = generated_page_completion.choices[0].message.content
+            }
+        ])
         open("curpage.html", "w+").write(generated_page)
         generated_page = self._format_page(generated_page)
 
@@ -141,7 +133,7 @@ class ReaperEngine:
     
     def get_search(self, query):
         # Generates a cool little search page, this differs in literally every search and is not cached so be weary of losing links
-        search_page_completion = self.client.chat.completions.create(messages=[
+        search_page = self._generate_completion([
             {
                 "role": "system",
                 "content": self.system_prompt
@@ -149,14 +141,38 @@ class ReaperEngine:
             {
                 "role": "user",
                 "content": f"Generate the search results page for a ficticious search engine where the search query is '{query}'. Please include at least 10 results to different ficticious websites that relate to the query. DO NOT link to any real websites, every link should lead to a ficticious website. Feel free to add a bit of CSS to make the page look nice. Each search result will link to its own unique website that has nothing to do with the search engine and is not a path or webpage on the search engine's site. Make sure each ficticious website has a unique and somewhat creative URL. Don't mention that the results are ficticious."
-            }],
-            model=self.model_name,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens
-        )
+            }
+        ])
 
-        return self._format_page(search_page_completion.choices[0].message.content)
+        return self._format_page(search_page)
 
+    def _generate_completion(self, messages):
+        """Generate completion using direct Ollama API calls."""
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "options": {
+                "temperature": self.temperature,
+                "num_predict": self.max_tokens
+            },
+            "stream": False
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.ollama_api_url}/api/chat",
+                json=payload,
+                timeout=120
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            return result["message"]["content"]
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error generating completion: {e}")
+            return "<!DOCTYPE html><html><body><h1>Error generating page</h1></body></html>"
+    
     def export_internet(self, filename="internet.json"):
         json.dump(self.internet_db, open(filename, "w+"))
         russells  = "Russell: I'm reading it here on my computer. I downloaded the internet before the war.\n"
