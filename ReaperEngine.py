@@ -31,41 +31,55 @@ class ReaperEngine:
         """Check if the required model is available, and pull it if not."""
         print(f"Checking if model '{self.model_name}' is available...")
         
-        try:
-            # Check if model exists
-            response = requests.get(f"{self.ollama_api_url}/api/tags")
-            if response.status_code == 200:
-                models = response.json().get("models", [])
-                model_names = [model["name"] for model in models]
+        # Retry logic for connecting to Ollama
+        max_retries = 30
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                # Check if model exists
+                response = requests.get(f"{self.ollama_api_url}/api/tags", timeout=10)
+                if response.status_code == 200:
+                    models = response.json().get("models", [])
+                    model_names = [model["name"] for model in models]
+                    
+                    if any(self.model_name in name for name in model_names):
+                        print(f"Model '{self.model_name}' is already available.")
+                        return
                 
-                if any(self.model_name in name for name in model_names):
-                    print(f"Model '{self.model_name}' is already available.")
+                # Model not found, pull it
+                print(f"Model '{self.model_name}' not found. Downloading...")
+                pull_response = requests.post(f"{self.ollama_api_url}/api/pull", 
+                                            json={"name": self.model_name}, 
+                                            timeout=300)
+                
+                if pull_response.status_code == 200:
+                    print(f"Successfully initiated download of '{self.model_name}'.")
+                    # Wait for the pull to complete by checking the response stream
+                    for line in pull_response.iter_lines():
+                        if line:
+                            data = json.loads(line.decode('utf-8'))
+                            if data.get("status") == "success":
+                                print(f"Model '{self.model_name}' downloaded successfully!")
+                                return
+                            elif "pulling" in data.get("status", "").lower():
+                                print(f"Downloading: {data.get('status', '')}")
+                else:
+                    print(f"Failed to download model '{self.model_name}': {pull_response.text}")
                     return
-            
-            # Model not found, pull it
-            print(f"Model '{self.model_name}' not found. Downloading...")
-            pull_response = requests.post(f"{self.ollama_api_url}/api/pull", 
-                                        json={"name": self.model_name})
-            
-            if pull_response.status_code == 200:
-                print(f"Successfully initiated download of '{self.model_name}'.")
-                # Wait for the pull to complete by checking the response stream
-                for line in pull_response.iter_lines():
-                    if line:
-                        data = json.loads(line.decode('utf-8'))
-                        if data.get("status") == "success":
-                            print(f"Model '{self.model_name}' downloaded successfully!")
-                            break
-                        elif "pulling" in data.get("status", "").lower():
-                            print(f"Downloading: {data.get('status', '')}")
-            else:
-                print(f"Failed to download model '{self.model_name}': {pull_response.text}")
-                
-        except requests.exceptions.RequestException as e:
-            print(f"Error connecting to Ollama: {e}")
-            print("Make sure Ollama is running and accessible.")
-        except Exception as e:
-            print(f"Unexpected error while checking model: {e}")
+                    
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    print(f"Attempt {attempt + 1}/{max_retries}: Error connecting to Ollama: {e}")
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"Failed to connect to Ollama after {max_retries} attempts: {e}")
+                    print("Make sure Ollama is running and accessible.")
+                    raise
+            except Exception as e:
+                print(f"Unexpected error while checking model: {e}")
+                raise
 
     def _format_page(self, dirty_html):
         # Teensy function to replace all links on the page so they link to the root of the server
