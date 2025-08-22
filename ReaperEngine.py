@@ -12,12 +12,11 @@ and fits with the Dead Internet Theory theme of this little project
 class ReaperEngine:
     def __init__(self):
         # Get Ollama base URL from environment or use default
-        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1/")
-        self.ollama_api_url = self.ollama_base_url.replace("/v1/", "")
+        self.ollama_api_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.model_name = os.getenv("OLLAMA_MODEL", "gemma3:1b")
         
         self.internet_db = dict() # TODO: Exporting this sounds like a good idea, losing all your pages when you kill the script kinda sucks ngl, also loading it is a thing too
 
-        self.model_name = "gemma3:1b"
         self.temperature = 1 # Crank up for goofier webpages (but probably less functional javascript)
         self.max_tokens = 4096
         self.system_prompt = "You are a web developer creating authentic vintage websites from the early 2000s era. Your task is to generate complete HTML pages that look genuinely retro.\n\nRules:\n1. Always start with <!DOCTYPE html> and end with </html>\n2. Only output HTML code, no explanations or comments\n3. Use inline CSS in <style> tags, no external stylesheets\n4. Include JavaScript in <script> tags if needed\n5. Avoid using images unless absolutely necessary\n6. Make pages look like they're from GeoCities, Angelfire, or similar retro hosting\n7. Use bright colors, animated GIFs sparingly, and retro web design elements\n8. Create realistic content that fits the website's theme"
