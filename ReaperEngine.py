@@ -1,4 +1,7 @@
 import json
+import os
+import time
+import requests
 from openai import OpenAI
 from bs4 import BeautifulSoup
 
@@ -9,13 +12,61 @@ and fits with the Dead Internet Theory theme of this little project
 
 class ReaperEngine:
     def __init__(self):
-        self.client = OpenAI(base_url="http://localhost:11434/v1/", api_key="Dead Internet") # Ollama is pretty cool
+        # Get Ollama base URL from environment or use default
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1/")
+        self.ollama_api_url = self.ollama_base_url.replace("/v1/", "")
+        
+        self.client = OpenAI(base_url=self.ollama_base_url, api_key="Dead Internet") # Ollama is pretty cool
         self.internet_db = dict() # TODO: Exporting this sounds like a good idea, losing all your pages when you kill the script kinda sucks ngl, also loading it is a thing too
 
+        self.model_name = "llama3"
         self.temperature = 2.1 # Crank up for goofier webpages (but probably less functional javascript)
         self.max_tokens = 4096
         self.system_prompt = "You are an expert in creating realistic webpages. You do not create sample pages, instead you create webpages that are completely realistic and look as if they really existed on the web. You do not respond with anything but HTML, starting your messages with <!DOCTYPE html> and ending them with </html>.  You use very little to no images at all in your HTML, CSS or JS, and when you do use an image it'll be linked from a real website instead. Link to very few external resources, CSS and JS should ideally be internal in <style>/<script> tags and not linked from elsewhere."
+        
+        # Ensure the model is available
+        self._ensure_model_available()
     
+    def _ensure_model_available(self):
+        """Check if the required model is available, and pull it if not."""
+        print(f"Checking if model '{self.model_name}' is available...")
+        
+        try:
+            # Check if model exists
+            response = requests.get(f"{self.ollama_api_url}/api/tags")
+            if response.status_code == 200:
+                models = response.json().get("models", [])
+                model_names = [model["name"] for model in models]
+                
+                if any(self.model_name in name for name in model_names):
+                    print(f"Model '{self.model_name}' is already available.")
+                    return
+            
+            # Model not found, pull it
+            print(f"Model '{self.model_name}' not found. Downloading...")
+            pull_response = requests.post(f"{self.ollama_api_url}/api/pull", 
+                                        json={"name": self.model_name})
+            
+            if pull_response.status_code == 200:
+                print(f"Successfully initiated download of '{self.model_name}'.")
+                # Wait for the pull to complete by checking the response stream
+                for line in pull_response.iter_lines():
+                    if line:
+                        data = json.loads(line.decode('utf-8'))
+                        if data.get("status") == "success":
+                            print(f"Model '{self.model_name}' downloaded successfully!")
+                            break
+                        elif "pulling" in data.get("status", "").lower():
+                            print(f"Downloading: {data.get('status', '')}")
+            else:
+                print(f"Failed to download model '{self.model_name}': {pull_response.text}")
+                
+        except requests.exceptions.RequestException as e:
+            print(f"Error connecting to Ollama: {e}")
+            print("Make sure Ollama is running and accessible.")
+        except Exception as e:
+            print(f"Unexpected error while checking model: {e}")
+
     def _format_page(self, dirty_html):
         # Teensy function to replace all links on the page so they link to the root of the server
         # Also to get rid of any http(s), this'll help make the link database more consistent
@@ -57,7 +108,7 @@ class ReaperEngine:
                 "role": "user",
                 "content": prompt
             }],
-            model="llama3", # What a great model, works near perfectly with this, shame its only got 8k context (does Ollama even set it to that by default?)
+            model=self.model_name, # What a great model, works near perfectly with this, shame its only got 8k context (does Ollama even set it to that by default?)
             temperature=self.temperature,
             max_tokens=self.max_tokens
         )
@@ -85,7 +136,7 @@ class ReaperEngine:
                 "role": "user",
                 "content": f"Generate the search results page for a ficticious search engine where the search query is '{query}'. Please include at least 10 results to different ficticious websites that relate to the query. DO NOT link to any real websites, every link should lead to a ficticious website. Feel free to add a bit of CSS to make the page look nice. Each search result will link to its own unique website that has nothing to do with the search engine and is not a path or webpage on the search engine's site. Make sure each ficticious website has a unique and somewhat creative URL. Don't mention that the results are ficticious."
             }],
-            model="llama3",
+            model=self.model_name,
             temperature=self.temperature,
             max_tokens=self.max_tokens
         )
