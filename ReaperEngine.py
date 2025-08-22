@@ -17,8 +17,8 @@ class ReaperEngine:
         
         self.internet_db = dict() # TODO: Exporting this sounds like a good idea, losing all your pages when you kill the script kinda sucks ngl, also loading it is a thing too
 
-        self.model_name = "llama3"
-        self.temperature = 2.1 # Crank up for goofier webpages (but probably less functional javascript)
+        self.model_name = "gemma3:1b"
+        self.temperature = 1 # Crank up for goofier webpages (but probably less functional javascript)
         self.max_tokens = 4096
         self.system_prompt = "You are an expert in creating realistic webpages. You do not create sample pages, instead you create webpages that are completely realistic and look as if they really existed on the web. You do not respond with anything but HTML, starting your messages with <!DOCTYPE html> and ending them with </html>.  You use very little to no images at all in your HTML, CSS or JS, and when you do use an image it'll be linked from a real website instead. Link to very few external resources, CSS and JS should ideally be internal in <style>/<script> tags and not linked from elsewhere."
         
